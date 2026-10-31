@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TataDana — Catat Keuangan Semudah Chat Langsung dari Telegram</title>
+  <!-- Tailwind CSS via allowlisted CDN -->
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #f1f5f9; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #ea580c; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased selection:bg-orange-500 selection:text-white">
+
+  <!-- ========================================================================= -->
+  <!-- ROUTE CONTAINER (SPA Router: landing | login | register | dashboard | admin) -->
+  <!-- ========================================================================= -->
+  <div id="app"></div>
+
+  <script>
+    // ---------------------------------------------------------------------------
+    // STATE & INITIAL DATA
+    // ---------------------------------------------------------------------------
+    const state = {
+      route: 'landing', // 'landing' | 'login' | 'register' | 'dashboard' | 'admin'
+      dashboardTab: 'beranda', // 'beranda' | 'transaksi' | 'laporan' | 'budget' | 'wallet' | 'settings'
+      settingsTab: 'telegram', // 'profile' | 'telegram' | 'reminder' | 'categories'
+      adminTab: 'users', // 'users' | 'ai' | 'payments' | 'audit'
+      user: {
+        name: 'Budi Santoso',
+        phone: '0812-8899-7766',
+        plan: 'pro',
+        balance: 14820000,
+        telegramConnected: true,
+        botUsername: 'TataDana_bot',
+        botToken: '7194829104:AAFnXj8s7d_live_token',
+      },
+      wallets: [
+        { id: '1', name: 'BCA (Default)', type: 'Bank Rekening', balance: 14820000, isDefault: true },
+        { id: '2', name: 'Mandiri', type: 'Bank Rekening', balance: 3500000, isDefault: false },
+        { id: '3', name: 'GoPay', type: 'E-Wallet', balance: 125000, isDefault: false },
+        { id: '4', name: 'Dompet Kas Fisik', type: 'Tunai', balance: 350000, isDefault: false },
+      ],
+      budgets: [
+        { id: '1', category: 'Makanan & Minuman', emoji: '🍜', limit: 2000000, spent: 1450000 },
+        { id: '2', category: 'Transportasi', emoji: '🚗', limit: 1000000, spent: 880000 },
+        { id: '3', category: 'Hiburan & Santai', emoji: '🎮', limit: 500000, spent: 520000 },
+        { id: '4', category: 'Tagihan & Utilitas', emoji: '🏠', limit: 800000, spent: 350000 },
+        { id: '5', category: 'Kesehatan & Obat', emoji: '💊', limit: 400000, spent: 75000 },
+      ],
+      transactions: [
+        { id: '1', date: 'Hari ini, 12:20 WIB', type: 'expense', name: 'Bakso Malang & Es Teh', category: 'Makanan & Minuman', emoji: '🍜', wallet: 'BCA', amount: 30000, source: 'telegram_text' },
+        { id: '2', date: 'Hari ini, 09:15 WIB', type: 'expense', name: 'Bensin Pertamax 5L', category: 'Transportasi', emoji: '🚗', wallet: 'BCA', amount: 65000, source: 'telegram_text' },
+        {
+          id: '3', date: 'Kemarin, 19:30 WIB', type: 'expense', name: 'Struk Indomaret Sudirman', category: 'Belanja Harian', emoji: '🧾', wallet: 'GoPay', amount: 68500, source: 'telegram_ocr', isOcr: true,
+          ocr_items: [
+            { name: 'Roti Gandum Sari Roti', price: 21000, qty: 1, category_name: 'Makanan & Minuman', category_emoji: '🍜' },
+            { name: 'Ultra Milk Coklat 1L', price: 22500, qty: 1, category_name: 'Makanan & Minuman', category_emoji: '🍜' },
+            { name: 'Air Mineral Club 600ml', price: 4000, qty: 1, category_name: 'Makanan & Minuman', category_emoji: '🍜' },
+            { name: 'Deterjen Rinso 800g', price: 21000, qty: 1, category_name: 'Belanja Harian', category_emoji: '👕' },
+          ]
+        },
+        { id: '4', date: 'Kemarin, 14:00 WIB', type: 'income', name: 'Pembayaran Desain Freelance', category: 'Freelance & Bisnis', emoji: '💼', wallet: 'BCA', amount: 2500000, source: 'web' },
+        { id: '5', date: '8 Okt, 20:10 WIB', type: 'expense', name: 'Tagihan Listrik PLN Oktober', category: 'Tagihan & Utilitas', emoji: '🏠', wallet: 'BCA', amount: 350000, source: 'telegram_text' },
+        { id: '6', date: '7 Okt, 12:45 WIB', type: 'expense', name: 'Kopi Susu Senja 2 Cup (Voice Note)', category: 'Makanan & Minuman', emoji: '🍜', wallet: 'GoPay', amount: 44000, source: 'telegram_voice' },
+        { id: '7', date: '1 Okt, 08:00 WIB', type: 'income', name: 'Gaji Bulanan PT Maju Bersama', category: 'Gaji & Penghasilan', emoji: '💰', wallet: 'BCA', amount: 5000000, source: 'web' },
+      ],
+      expandedReceiptId: '3',
+      telegramTestingStatus: 'connected', // 'connected' | 'testing' | 'disconnected'
+      botStatusMsg: '🟢 Terhubung (@TataDana_bot) — Webhook aktif',
+      demoChat: [
+        { sender: 'user', text: 'beli bakso malang 25rb sama es teh 5rb' },
+        {
+          sender: 'bot',
+          text: `📅 Sabtu, 10 Okt 2026 — 12:30 WIB
+💸 <b>Pengeluaran tercatat!</b>
+├ Nominal : <b>Rp 30.000</b>
+├ Kategori : 🍜 Makanan & Minuman
+├ Dompet : 👛 BCA (Default)
+├ Catatan : beli bakso malang 25rb sama es teh 5rb
+└ Saldo : <b>Rp 14.820.000</b>
+
+📊 <b>Budget Makanan bulan ini:</b>
+[██████████████░░░░░░] 72.5% — sisa Rp 550.000
+<i>💡 Hemat ya, pengeluaran kuliner sudah di atas rata-rata minggu lalu!</i>`
+        }
+      ]
+    };
+
+    function formatRupiah(num) {
+      return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num).replace(/\s+/g, ' ');
+    }
+
+    function navigate(route, tab) {
+      state.route = route;
+      if (tab) {
+        if (route === 'dashboard') state.dashboardTab = tab;
+        if (route === 'admin') state.adminTab = tab;
+      }
+      render();
+      window.scrollTo(0, 0);
+    }
+
+    // ---------------------------------------------------------------------------
+    // RENDER DISPATCHER
+    // ---------------------------------------------------------------------------
+    function render() {
+      const app = document.getElementById('app');
+      if (state.route === 'landing') {
+        app.innerHTML = renderLanding();
+      } else if (state.route === 'login') {
+        app.innerHTML = renderLogin();
+      } else if (state.route === 'register') {
+        app.innerHTML = renderRegister();
+      } else if (state.route === 'dashboard') {
+        app.innerHTML = renderDashboard();
+      } else if (state.route === 'admin') {
+        app.innerHTML = renderAdmin();
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // 1. LANDING PAGE RENDERER (12 Sections from Part 7)
+    // ---------------------------------------------------------------------------
+    function renderLanding() {
+      return `
+      <!-- 1. NAVBAR -->
+      <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div class="flex items-center gap-2.5 cursor-pointer" onclick="navigate('landing')">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-orange-500/20">
+              TD
+            </div>
+            <span class="font-extrabold text-xl tracking-tight text-slate-900">Tata<span class="text-orange-600">Dana</span></span>
+          </div>
+          <nav class="hidden md:flex items-center gap-8 text-xs font-bold text-slate-600">
+            <a href="#fitur" class="hover:text-orange-600 transition">Fitur</a>
+            <a href="#demo" class="hover:text-orange-600 transition">Live Demo Bot</a>
+            <a href="#harga" class="hover:text-orange-600 transition">Harga</a>
+            <a href="#faq" class="hover:text-orange-600 transition">FAQ</a>
+          </nav>
+          <div class="flex items-center gap-3">
+            <button onclick="navigate('login')" class="px-4 py-2 text-xs font-bold text-slate-700 hover:text-orange-600 transition">Masuk</button>
+            <button onclick="navigate('register')" class="px-4 py-2 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-md shadow-orange-600/20 transition active:scale-95">Coba Gratis</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- 2. HERO SECTION -->
+      <section class="pt-16 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-xs font-semibold mb-6 shadow-sm">
+          <span>✨ Catat keuangan langsung dari Telegram</span>
+        </div>
+        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-950 tracking-tight max-w-4xl mx-auto leading-tight">
+          Gaji habis sebelum akhir bulan? <span class="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 bg-clip-text text-transparent">Sudah saatnya kamu tahu</span> ke mana uangmu pergi.
+        </h1>
+        <p class="mt-6 text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto font-normal">
+          TataDana mencatat setiap pengeluaranmu langsung dari chat Telegram atau foto struk — sisanya kami yang urus.
+        </p>
+        <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <button onclick="navigate('register')" class="w-full sm:w-auto px-8 py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-lg shadow-orange-600/30 transition text-sm">
+            Mulai Gratis Sekarang →
+          </button>
+          <a href="#demo" class="w-full sm:w-auto px-8 py-3.5 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-xl border border-slate-300 transition text-sm shadow-sm">
+            Lihat cara kerjanya →
+          </a>
+        </div>
+
+        <!-- Video Placeholder -->
+        <div class="mt-14 max-w-4xl mx-auto rounded-3xl overflow-hidden border border-slate-200 bg-slate-950 shadow-2xl relative aspect-video flex items-center justify-center group cursor-pointer">
+          <div class="text-center p-6">
+            <div class="w-20 h-20 rounded-full bg-orange-600 text-white flex items-center justify-center mx-auto shadow-2xl transition transform group-hover:scale-105 mb-4 text-2xl font-bold">
+              ▶
+            </div>
+            <p class="text-white font-bold text-lg">Tonton Demo 60 Detik TataDana</p>
+            <p class="text-slate-400 text-xs mt-1">// TODO: Video showcase produk resmi TataDana</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. PROBLEM AWARE BULLETS -->
+      <section class="py-16 bg-white border-y border-slate-200">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center max-w-2xl mx-auto mb-12">
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900">Apakah Kamu Sering Mengalami Ini?</h2>
+            <p class="text-slate-600 mt-2 text-xs sm:text-sm">Rata-rata orang gagal mengelola keuangan bukan karena kurang uang, tapi sistem pencatatan yang rumit.</p>
+          </div>
+          <div class="grid md:grid-cols-3 gap-6">
+            <div class="p-6 rounded-2xl bg-orange-50/50 border border-orange-100 text-left">
+              <div class="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold mb-3 text-sm">1</div>
+              <h3 class="font-bold text-slate-900 text-base">"Buka aplikasi keuangan? Nanti dulu deh..."</h3>
+              <p class="mt-2 text-xs text-slate-600 leading-relaxed">Aplikasi keuangan biasa butuh login, pilih menu, isi form 5 langkah. Terlalu ribet saat buru-buru, akhirnya malas mencatat.</p>
+            </div>
+            <div class="p-6 rounded-2xl bg-orange-50/50 border border-orange-100 text-left">
+              <div class="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold mb-3 text-sm">2</div>
+              <h3 class="font-bold text-slate-900 text-base">"Kok uangnya habis ya? Padahal kayak tidak beli apa-apa"</h3>
+              <p class="mt-2 text-xs text-slate-600 leading-relaxed">Kopi 25rb, parkir 5rb, jajan gorengan 15rb. Pengeluaran mikro harian yang tak tercatat adalah kebocoran finansial terbesar.</p>
+            </div>
+            <div class="p-6 rounded-2xl bg-orange-50/50 border border-orange-100 text-left">
+              <div class="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold mb-3 text-sm">3</div>
+              <h3 class="font-bold text-slate-900 text-base">"Udah niat bikin budget, tapi seminggu lupa"</h3>
+              <p class="mt-2 text-xs text-slate-600 leading-relaxed">Budget yang tidak dipantau real-time sama saja tidak ada budget. Tanpa pengingat otomatis di chat favoritmu, budget cuma wacana.</p>
+            </div>
+          </div>
+          <div class="mt-16 text-center max-w-2xl mx-auto">
+            <p class="text-orange-600 font-semibold text-sm">Bagaimana kalau mencatat keuangan semudah kirim pesan ke teman?</p>
+            <h3 class="text-3xl font-extrabold text-slate-950 mt-1">Introducing <span class="text-orange-600">TataDana</span></h3>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. LIVE INTERACTIVE DEMO (BOT SIMULATOR) -->
+      <section id="demo" class="py-20 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center max-w-2xl mx-auto mb-10">
+          <span class="text-orange-600 font-bold text-xs uppercase tracking-wider">Coba Langsung</span>
+          <h2 class="text-3xl font-extrabold text-slate-900 mt-1">Simulasi Chat Bot Telegram TataDana</h2>
+          <p class="text-slate-600 text-xs mt-2">Ketik kalimat natural di bawah dan saksikan bot memproses dan membalas otomatis!</p>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-8 items-start">
+          <!-- Chat box -->
+          <div class="bg-slate-900 rounded-3xl p-5 border border-slate-800 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 text-white">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-orange-600 flex items-center justify-center text-white font-bold text-sm">🤖</div>
+                <div>
+                  <h4 class="font-bold text-sm">TataDana Bot</h4>
+                  <p class="text-[10px] text-emerald-400">● bot aktif online (WIB)</p>
+                </div>
+              </div>
+              <span class="text-xs text-slate-400">@TataDana_bot</span>
+            </div>
+
+            <div class="py-4 space-y-3 h-72 overflow-y-auto font-sans text-xs scrollbar-thin" id="landingChatArea">
+              ${state.demoChat.map(m => `
+                <div class="flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}">
+                  ${m.sender === 'user'
+                    ? `<div class="bg-orange-600 text-white px-3.5 py-2 rounded-2xl rounded-tr-sm max-w-[80%] shadow">${m.text}</div>`
+                    : `<div class="bg-slate-800 border border-slate-700 text-amber-200 p-3.5 rounded-2xl rounded-tl-sm max-w-[90%] font-mono text-[11px] leading-relaxed shadow">${m.text.replace(/\n/g, '<br/>')}</div>`
+                  }
+                </div>
+              `).join('')}
+            </div>
+
+            <div class="mt-3 flex gap-2">
+              <input type="text" id="landingChatInput" placeholder="Ketik: bensin 50rb / nongkrong 45k / gajian 5jt" 
+                     class="flex-1 bg-slate-950 border border-slate-700 text-white text-xs px-3.5 py-2.5 rounded-xl focus:outline-none focus:border-orange-500" 
+                     onkeydown="if(event.key === 'Enter') sendLandingDemoMessage()">
+              <button onclick="sendLandingDemoMessage()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow transition">
+                Kirim
+              </button>
+            </div>
+          </div>
+
+          <!-- Web Dashboard Mini Preview -->
+          <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-xl space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h4 class="font-bold text-sm text-slate-900">Dashboard Web TataDana</h4>
+                <p class="text-[11px] text-slate-500">Tersinkronisasi otomatis dengan chat Telegram</p>
+              </div>
+              <span class="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                Supabase Realtime
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+                <span class="text-[11px] text-slate-500">Saldo Total (BCA)</span>
+                <p class="text-base font-extrabold text-slate-900 mt-1">Rp 14.820.000</p>
+                <span class="text-[10px] text-emerald-600 font-semibold">▲ +8.2% vs bln lalu</span>
+              </div>
+              <div class="p-3.5 rounded-2xl bg-orange-50/50 border border-orange-100">
+                <span class="text-[11px] text-orange-800">Pengeluaran Bln Ini</span>
+                <p class="text-base font-extrabold text-orange-600 mt-1">Rp 3.450.000</p>
+                <span class="text-[10px] text-slate-500">43 transaksi</span>
+              </div>
+            </div>
+            <div class="pt-2">
+              <button onclick="navigate('dashboard')" class="w-full py-2.5 bg-orange-600 text-white text-xs font-bold rounded-xl text-center shadow-md hover:bg-orange-700 transition">
+                Masuk ke Live Dashboard Pengguna →
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. PRICING SECTION -->
+      <section id="harga" class="py-20 bg-white border-y border-slate-200">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center max-w-2xl mx-auto mb-12">
+            <span class="text-orange-600 font-bold text-xs uppercase tracking-wider">Paket Berlangganan</span>
+            <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-950 mt-1">Investasi Kecil untuk Finansial Terkontrol</h2>
+            <p class="text-slate-600 text-xs mt-2">Pilih paket yang paling pas dengan kebutuhan pencatatanmu.</p>
+          </div>
+          <div class="grid md:grid-cols-2 gap-8">
+            <!-- Starter -->
+            <div class="p-8 rounded-3xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
+              <div>
+                <h3 class="font-extrabold text-xl text-slate-900">Starter</h3>
+                <div class="my-4"><span class="text-3xl font-extrabold text-slate-950">Rp 49.000</span><span class="text-slate-500 text-xs"> / bulan</span></div>
+                <p class="text-xs text-slate-600 mb-6">Solusi hemat untuk membiasakan mencatat keuangan harian via Telegram.</p>
+                <ul class="space-y-3 text-xs text-slate-700">
+                  <li>✓ Catat transaksi via teks & Voice Note Telegram</li>
+                  <li>✓ Dashboard web lengkap</li>
+                  <li>✓ Maksimal 50 transaksi / bulan</li>
+                  <li>✓ Maksimal 3 wallet & 5 kategori budget</li>
+                  <li>✓ Laporan ringkasan bulanan</li>
+                  <li class="text-slate-400">✗ Tidak ada input foto struk</li>
+                  <li class="text-slate-400">✗ Tidak ada AI Advisor & Export PDF/Excel</li>
+                </ul>
+              </div>
+              <button onclick="navigate('register')" class="mt-8 w-full py-3 bg-white hover:bg-slate-100 text-slate-800 font-bold rounded-xl border border-slate-300 text-xs transition shadow-sm">
+                Pilih Starter
+              </button>
+            </div>
+            <!-- Pro -->
+            <div class="p-8 rounded-3xl bg-white border-2 border-orange-500 shadow-xl flex flex-col justify-between relative overflow-hidden">
+              <div class="absolute top-0 right-0 bg-orange-600 text-white text-[10px] font-extrabold uppercase px-4 py-1 rounded-bl-xl">Paling Populer</div>
+              <div>
+                <h3 class="font-extrabold text-xl text-slate-900">Pro Lifetime</h3>
+                <div class="my-4"><span class="text-4xl font-extrabold text-slate-950">Rp 99.000</span><span class="text-slate-500 text-xs"> / sekali bayar</span></div>
+                <p class="text-xs text-slate-600 mb-6">Kendali penuh keuangan tanpa batas transaksi dengan bantuan AI Vision dan Financial Advisor.</p>
+                <ul class="space-y-3 text-xs text-slate-700">
+                  <li class="font-bold text-slate-900">✓ Semua fitur paket Starter</li>
+                  <li>✓ <b>Unlimited transaksi</b>, wallet, dan kategori</li>
+                  <li class="font-bold text-orange-700">✓ Input via foto struk (AI OCR Vision)</li>
+                  <li class="font-bold text-orange-700">✓ AI Financial Advisor aktif otomatis</li>
+                  <li>✓ Laporan lengkap + <b>Export unlimited PDF & Excel</b></li>
+                  <li>✓ Pengingat reminder custom hingga 2x/hari</li>
+                </ul>
+              </div>
+              <button onclick="navigate('register')" class="mt-8 w-full py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-orange-600/25">
+                Ambil Pro Sekarang →
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. FINAL CTA & FOOTER -->
+      <section class="py-16 bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 text-white text-center px-4">
+        <h2 class="text-3xl font-extrabold">Mulai kendalikan keuanganmu hari ini</h2>
+        <p class="text-orange-100 text-sm mt-2">Daftar sekarang gratis dan langsung hubungkan ke Telegram kamu.</p>
+        <button onclick="navigate('register')" class="mt-6 px-8 py-3.5 bg-white text-orange-600 font-bold rounded-2xl shadow-xl hover:bg-orange-50 transition text-sm">
+          Daftar Gratis Sekarang
+        </button>
+      </section>
+
+      <footer class="bg-slate-950 text-slate-400 py-12 border-t border-slate-900 text-xs text-center">
+        <p>&copy; 2026 TataDana Indonesia. Hak Cipta Dilindungi Undang-Undang. Waktu Standar Indonesia (WIB).</p>
+      </footer>
+      `;
+    }
+
+    // ---------------------------------------------------------------------------
+    // 2. AUTH RENDERERS
+    // ---------------------------------------------------------------------------
+    function renderLogin() {
+      return `
+      <div class="min-h-screen flex bg-slate-50">
+        <div class="hidden lg:flex lg:w-5/12 bg-gradient-to-br from-orange-600 via-orange-700 to-amber-700 text-white p-12 flex-col justify-between">
+          <div class="flex items-center gap-3 cursor-pointer" onclick="navigate('landing')">
+            <div class="w-10 h-10 rounded-2xl bg-white text-orange-600 font-bold flex items-center justify-center text-lg shadow-lg">TD</div>
+            <span class="font-extrabold text-2xl tracking-tight text-white">TataDana</span>
+          </div>
+          <div>
+            <h2 class="text-4xl font-extrabold tracking-tight leading-tight">Keuanganmu.<br>Terkontrol.</h2>
+            <p class="mt-4 text-orange-100 text-xs leading-relaxed">Catat pemasukan dan pengeluaran secepat kirim pesan Telegram.</p>
+          </div>
+          <div class="text-xs text-orange-200">Supabase Auth & Database Terenkripsi</div>
+        </div>
+        <div class="flex-1 flex items-center justify-center p-6 sm:p-12">
+          <div class="w-full max-w-md space-y-6">
+            <h1 class="text-2xl font-extrabold text-slate-900">Selamat Datang Kembali</h1>
+            <form onsubmit="event.preventDefault(); navigate('dashboard');" class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Email</label>
+                <input type="email" required value="budi@tatadana.id" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Kata Sandi</label>
+                <input type="password" required value="password123" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900">
+              </div>
+              <button type="submit" class="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs shadow-md shadow-orange-600/20 transition">
+                Masuk ke Dashboard →
+              </button>
+            </form>
+            <p class="text-center text-xs text-slate-600">
+              Belum punya akun? <a href="javascript:void(0)" onclick="navigate('register')" class="font-bold text-orange-600">Daftar sekarang gratis</a>
+            </p>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function renderRegister() {
+      return `
+      <div class="min-h-screen flex bg-slate-50">
+        <div class="hidden lg:flex lg:w-5/12 bg-gradient-to-br from-orange-600 via-orange-700 to-amber-700 text-white p-12 flex-col justify-between">
+          <div class="flex items-center gap-3 cursor-pointer" onclick="navigate('landing')">
+            <div class="w-10 h-10 rounded-2xl bg-white text-orange-600 font-bold flex items-center justify-center text-lg shadow-lg">TD</div>
+            <span class="font-extrabold text-2xl tracking-tight text-white">TataDana</span>
+          </div>
+          <div>
+            <h2 class="text-4xl font-extrabold tracking-tight leading-tight">Daftar Dalam 1 Menit.<br>Kontrol Penuh Selamanya.</h2>
+            <p class="mt-4 text-orange-100 text-xs leading-relaxed">Sistem otomatis menyiapkan dompet default dan kategori rekomendasi AI.</p>
+          </div>
+          <div class="text-xs text-orange-200">Verifikasi Nomor HP & OTP Indonesia</div>
+        </div>
+        <div class="flex-1 flex items-center justify-center p-6 sm:p-12">
+          <div class="w-full max-w-md space-y-6">
+            <h1 class="text-2xl font-extrabold text-slate-900">Buat Akun TataDana</h1>
+            <form onsubmit="event.preventDefault(); navigate('dashboard');" class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap</label>
+                <input type="text" required value="Budi Santoso" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Nomor HP / WhatsApp (Verifikasi OTP)</label>
+                <input type="tel" required value="081288997766" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Kata Sandi</label>
+                <input type="password" required value="rahasia123" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900">
+              </div>
+              <button type="submit" class="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs shadow-md shadow-orange-600/20 transition">
+                Daftar & Masuk ke Dashboard →
+              </button>
+            </form>
+            <p class="text-center text-xs text-slate-600">
+              Sudah punya akun? <a href="javascript:void(0)" onclick="navigate('login')" class="font-bold text-orange-600">Masuk di sini</a>
+            </p>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // ---------------------------------------------------------------------------
+    // 3. DASHBOARD RENDERER
+    // ---------------------------------------------------------------------------
+    function renderDashboard() {
+      return `
+      <div class="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+        <!-- SIDEBAR -->
+        <aside class="w-full md:w-64 bg-white border-r border-slate-200 p-4 flex flex-col justify-between">
+          <div class="space-y-6">
+            <div class="flex items-center gap-2.5 px-2 cursor-pointer" onclick="navigate('landing')">
+              <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white font-bold text-sm shadow">TD</div>
+              <div>
+                <span class="font-extrabold text-base text-slate-900 block leading-none">Tata<span class="text-orange-600">Dana</span></span>
+                <span class="text-[10px] text-slate-400">Fintech Indonesia</span>
+              </div>
+            </div>
+
+            <!-- User badge -->
+            <div class="p-3 rounded-2xl bg-orange-50 border border-orange-200">
+              <div class="flex items-center justify-between mb-0.5">
+                <span class="text-[10px] font-bold text-orange-700 uppercase">Paket ${state.user.plan.toUpperCase()}</span>
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+              </div>
+              <p class="text-xs font-bold text-slate-800">${state.user.name}</p>
+              <p class="text-[10px] text-slate-500">${state.user.phone}</p>
+            </div>
+
+            <!-- Nav Items -->
+            <nav class="space-y-1 text-xs font-bold">
+              ${[
+                { id: 'beranda', label: '🏠 Beranda' },
+                { id: 'transaksi', label: '💳 Transaksi' },
+                { id: 'laporan', label: '📊 Laporan' },
+                { id: 'budget', label: '🎯 Budget' },
+                { id: 'wallet', label: '👛 Wallet' },
+                { id: 'settings', label: '⚙️ Settings' },
+              ].map(item => `
+                <button onclick="navigate('dashboard', '${item.id}')" class="w-full text-left px-3.5 py-2.5 rounded-xl transition ${
+                  state.dashboardTab === item.id ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20' : 'text-slate-600 hover:bg-orange-50/60 hover:text-orange-600'
+                }">
+                  ${item.label}
+                </button>
+              `).join('')}
+            </nav>
+          </div>
+
+          <div class="space-y-2 pt-4 border-t border-slate-100">
+            <button onclick="navigate('admin')" class="w-full text-left px-3 py-2 rounded-xl text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition flex items-center justify-between">
+              <span>🛡️ Superadmin Panel</span>
+              <span>➔</span>
+            </button>
+            <button onclick="navigate('landing')" class="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition">
+              🚪 Keluar Akun
+            </button>
+          </div>
+        </aside>
+
+        <!-- MAIN VIEW -->
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl">
+          ${renderDashboardContent()}
+        </main>
+      </div>`;
+    }
+
+    function renderDashboardContent() {
+      if (state.dashboardTab === 'beranda') {
+        return `
+        <div class="space-y-6">
+          <div class="flex justify-between items-center">
+            <div>
+              <h1 class="text-2xl font-extrabold text-slate-900">Ringkasan Keuangan</h1>
+              <p class="text-xs text-slate-500">Sinkronisasi real-time Supabase & Telegram Bot (WIB).</p>
+            </div>
+            <div class="flex gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold">
+              <span class="px-3 py-1 bg-orange-600 text-white rounded-lg">Bulanan</span>
+            </div>
+          </div>
+
+          <!-- 4 Stats Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <span class="text-xs text-slate-500 font-semibold">Total Saldo (4 Wallet)</span>
+              <h3 class="text-2xl font-extrabold text-slate-950 mt-2">${formatRupiah(state.user.balance)}</h3>
+              <span class="text-[10px] text-emerald-600 font-bold mt-1 block">▲ +12.4% bln ini</span>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <span class="text-xs text-slate-500 font-semibold">Pemasukan Bulan Ini</span>
+              <h3 class="text-2xl font-extrabold text-emerald-600 mt-2">Rp 7.500.000</h3>
+              <span class="text-[10px] text-slate-400 mt-1 block">Gaji + 1 Freelance</span>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <span class="text-xs text-slate-500 font-semibold">Pengeluaran Bulan Ini</span>
+              <h3 class="text-2xl font-extrabold text-orange-600 mt-2">Rp 3.450.000</h3>
+              <span class="text-[10px] text-slate-400 mt-1 block">43 transaksi tercatat</span>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <span class="text-xs text-slate-500 font-semibold">Budget Tersisa</span>
+              <h3 class="text-2xl font-extrabold text-amber-600 mt-2">Rp 1.550.000</h3>
+              <span class="text-[10px] text-slate-400 mt-1 block">69% terpakai</span>
+            </div>
+          </div>
+
+          <!-- Onboarding Banner -->
+          <div class="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl p-4 text-white shadow-md">
+            <div class="flex justify-between items-center mb-2">
+              <h3 class="font-extrabold text-sm">✨ Onboarding TataDana (100% Selesai)</h3>
+              <span class="text-[10px] bg-white/20 px-2.5 py-0.5 rounded-full font-bold">4 / 4 Selesai</span>
+            </div>
+            <div class="grid sm:grid-cols-4 gap-2 text-[11px]">
+              <div class="bg-white/10 p-2 rounded-xl">✓ Telegram Bot Terhubung</div>
+              <div class="bg-white/10 p-2 rounded-xl">✓ Dompet Default (BCA)</div>
+              <div class="bg-white/10 p-2 rounded-xl">✓ Budget Bulanan Diset</div>
+              <div class="bg-white/10 p-2 rounded-xl">✓ Transaksi Pertama Masuk</div>
+            </div>
+          </div>
+
+          <!-- 10 Transaksi Terbaru -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center">
+              <div>
+                <h3 class="font-extrabold text-sm text-slate-900">Transaksi Terbaru</h3>
+                <p class="text-xs text-slate-400">Pencatatan real-time dari chat Telegram & Web</p>
+              </div>
+              <button onclick="navigate('dashboard', 'transaksi')" class="px-3 py-1.5 bg-orange-600 text-white rounded-xl text-xs font-bold">
+                + Catat Manual
+              </button>
+            </div>
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500 font-bold uppercase text-[10px]">
+                <tr>
+                  <th class="px-5 py-3">Waktu (WIB)</th>
+                  <th class="px-5 py-3">Transaksi</th>
+                  <th class="px-5 py-3">Kategori</th>
+                  <th class="px-5 py-3">Dompet</th>
+                  <th class="px-5 py-3 text-right">Nominal</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${state.transactions.map(t => `
+                  <tr class="hover:bg-slate-50 transition">
+                    <td class="px-5 py-3 text-slate-500 font-mono text-[11px]">${t.date}</td>
+                    <td class="px-5 py-3 font-semibold text-slate-900">
+                      ${t.name} ${t.isOcr ? '<span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold">OCR Struk</span>' : ''}
+                    </td>
+                    <td class="px-5 py-3">${t.emoji} ${t.category}</td>
+                    <td class="px-5 py-3 font-medium text-slate-600">👛 ${t.wallet}</td>
+                    <td class="px-5 py-3 text-right font-extrabold ${t.type === 'expense' ? 'text-orange-600' : 'text-emerald-600'}">
+                      ${t.type === 'expense' ? '-' : '+'} ${formatRupiah(t.amount)}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      }
+
+      if (state.dashboardTab === 'transaksi') {
+        return `
+        <div class="max-w-2xl mx-auto space-y-6">
+          <h1 class="text-2xl font-extrabold text-slate-900">Catat Transaksi Manual</h1>
+          <form onsubmit="handleManualTransaction(event)" class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Jenis Transaksi</label>
+              <div class="grid grid-cols-3 gap-2">
+                <button type="button" id="tabExpense" onclick="setTxType('expense')" class="py-2 bg-orange-600 text-white rounded-xl text-xs font-bold">Pengeluaran</button>
+                <button type="button" id="tabIncome" onclick="setTxType('income')" class="py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Pemasukan</button>
+                <button type="button" id="tabTransfer" onclick="setTxType('transfer')" class="py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Transfer</button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Nominal (IDR)</label>
+              <input type="number" id="txAmount" required placeholder="50000" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold text-slate-900">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Kategori</label>
+              <select id="txCat" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold">
+                <option>Makanan & Minuman</option>
+                <option>Transportasi</option>
+                <option>Tagihan & Utilitas</option>
+                <option>Hiburan & Santai</option>
+                <option>Gaji & Penghasilan</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Catatan</label>
+              <input type="text" id="txNotes" placeholder="Contoh: makan siang di kantin" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900">
+            </div>
+            <button type="submit" class="w-full py-3 bg-orange-600 text-white font-bold rounded-xl text-xs shadow transition">
+              Simpan Transaksi →
+            </button>
+          </form>
+        </div>`;
+      }
+
+      if (state.dashboardTab === 'laporan') {
+        return `
+        <div class="space-y-6">
+          <div class="flex justify-between items-center">
+            <div>
+              <h1 class="text-2xl font-extrabold text-slate-900">Laporan Keuangan & Audit</h1>
+              <p class="text-xs text-slate-500">Tabel transaksi lengkap, expand rincian struk, ekspor PDF/Excel.</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="downloadReport('pdf')" class="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-sm">
+                📄 Ekspor PDF
+              </button>
+              <button onclick="downloadReport('xlsx')" class="px-3.5 py-2 bg-orange-600 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-600/20">
+                📊 Ekspor Excel
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500 font-bold uppercase text-[10px]">
+                <tr>
+                  <th class="px-5 py-3">Tanggal & Waktu (WIB)</th>
+                  <th class="px-5 py-3">Kategori</th>
+                  <th class="px-5 py-3">Keterangan / Merchant</th>
+                  <th class="px-5 py-3">Dompet</th>
+                  <th class="px-5 py-3 text-right">Nominal</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${state.transactions.map(t => `
+                  <tr class="hover:bg-slate-50 transition">
+                    <td class="px-5 py-3 text-slate-500 font-mono text-[11px]">${t.date}</td>
+                    <td class="px-5 py-3">${t.emoji} ${t.category}</td>
+                    <td class="px-5 py-3 font-semibold text-slate-900">
+                      ${t.name}
+                      ${t.isOcr ? `
+                        <button onclick="toggleReceiptExpand('${t.id}')" class="ml-2 text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold hover:bg-amber-200">
+                          📸 ${state.expandedReceiptId === t.id ? 'Tutup Rincian' : 'Lihat ' + t.ocr_items.length + ' Item'}
+                        </button>
+                      ` : ''}
+                    </td>
+                    <td class="px-5 py-3 text-slate-600">👛 ${t.wallet}</td>
+                    <td class="px-5 py-3 text-right font-extrabold ${t.type === 'expense' ? 'text-orange-600' : 'text-emerald-600'}">
+                      ${t.type === 'expense' ? '-' : '+'} ${formatRupiah(t.amount)}
+                    </td>
+                  </tr>
+                  ${state.expandedReceiptId === t.id && t.isOcr ? `
+                    <tr class="bg-amber-50/50">
+                      <td colspan="5" class="px-8 py-3">
+                        <div class="text-[11px] font-bold text-amber-900 mb-2">Rincian Hasil AI OCR Struk:</div>
+                        <div class="grid sm:grid-cols-2 gap-2 text-xs">
+                          ${t.ocr_items.map(item => `
+                            <div class="bg-white p-2 rounded-lg border border-amber-200 flex justify-between">
+                              <span>${item.name}</span>
+                              <span class="font-bold">${formatRupiah(item.price)}</span>
+                            </div>
+                          `).join('')}
+                        </div>
+                      </td>
+                    </tr>
+                  ` : ''}
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      }
+
+      if (state.dashboardTab === 'budget') {
+        return `
+        <div class="space-y-6">
+          <h1 class="text-2xl font-extrabold text-slate-900">Budget per Kategori & Alert 80%/100%</h1>
+          <div class="grid md:grid-cols-2 gap-4">
+            ${state.budgets.map(b => {
+              const pct = (b.spent / b.limit) * 100;
+              const isOver = pct >= 100;
+              const isWarn = pct >= 80 && pct < 100;
+              return `
+                <div class="p-5 rounded-2xl bg-white border ${isOver ? 'border-red-300' : isWarn ? 'border-orange-300' : 'border-slate-200'} shadow-sm">
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="font-bold text-sm text-slate-900">${b.emoji} ${b.category}</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${isOver ? 'bg-red-100 text-red-700' : isWarn ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}">
+                      ${isOver ? '🚨 Over 100%' : isWarn ? '⚠️ Waspada 80%' : 'Aman'}
+                    </span>
+                  </div>
+                  <div class="flex justify-between text-xs font-semibold text-slate-600 mb-1">
+                    <span>Terpakai: ${formatRupiah(b.spent)}</span>
+                    <span>Batas: ${formatRupiah(b.limit)}</span>
+                  </div>
+                  <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full ${isOver ? 'bg-red-500' : isWarn ? 'bg-orange-500' : 'bg-emerald-500'}" style="width: ${Math.min(100, pct)}%"></div>
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }
+
+      if (state.dashboardTab === 'wallet') {
+        return `
+        <div class="space-y-6">
+          <h1 class="text-2xl font-extrabold text-slate-900">Multi-Wallet (Dompet Keuangan)</h1>
+          <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            ${state.wallets.map(w => `
+              <div class="p-5 rounded-2xl bg-white border ${w.isDefault ? 'border-orange-500 ring-2 ring-orange-500/20' : 'border-slate-200'} shadow-sm flex flex-col justify-between">
+                <div>
+                  <span class="text-[10px] font-bold text-slate-400 uppercase">${w.type}</span>
+                  <h3 class="text-base font-extrabold text-slate-900 mt-1">${w.name}</h3>
+                  <p class="text-lg font-bold text-slate-800 mt-2">${formatRupiah(w.balance)}</p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100">
+                  ${w.isDefault
+                    ? '<span class="text-xs font-bold text-orange-600">✓ Default Bot Telegram</span>'
+                    : `<button onclick="setDefaultWallet('${w.id}')" class="text-xs text-slate-600 hover:text-orange-600 font-semibold">Jadikan Default</button>`
+                  }
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+      }
+
+      if (state.dashboardTab === 'settings') {
+        return `
+        <div class="max-w-3xl space-y-6">
+          <h1 class="text-2xl font-extrabold text-slate-900">Pengaturan Bot Telegram & Sistem</h1>
+          <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+              <div>
+                <h3 class="font-extrabold text-base text-slate-900">Status Token Bot Telegram</h3>
+                <p class="text-xs text-slate-500">Mengecek koneksi getMe dan setWebhook Telegram.</p>
+              </div>
+              <span class="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-bold">
+                ${state.botStatusMsg}
+              </span>
+            </div>
+
+            <!-- Bot Token Input & Test Button -->
+            <div class="space-y-2">
+              <label class="block text-xs font-bold text-slate-700">Token Bot (@BotFather)</label>
+              <div class="flex gap-2">
+                <input type="text" id="settingToken" value="${state.user.botToken}" class="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono">
+                <button onclick="testBotConnection()" class="px-5 py-2.5 bg-orange-600 text-white rounded-xl text-xs font-bold shadow hover:bg-orange-700 transition">
+                  ${state.telegramTestingStatus === 'testing' ? '⏳ Testing...' : 'Test Koneksi'}
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400">Tekan 'Test Koneksi' untuk memverifikasi getMe dan mendaftarkan webhook /api/telegram/webhook.</p>
+            </div>
+          </div>
+        </div>`;
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // 4. ADMIN RENDERER (Superadmin Dashboard)
+    // ---------------------------------------------------------------------------
+    function renderAdmin() {
+      return `
+      <div class="min-h-screen bg-slate-900 text-slate-100 p-6 sm:p-10">
+        <div class="max-w-6xl mx-auto space-y-6">
+          <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+            <div class="flex items-center gap-3">
+              <button onclick="navigate('dashboard')" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold">← Dashboard</button>
+              <h1 class="text-2xl font-extrabold text-white">Superadmin Dashboard TataDana</h1>
+            </div>
+            <span class="text-xs bg-orange-600/20 text-orange-400 border border-orange-500/30 px-3 py-1 rounded-full font-bold">SaaS Superadmin</span>
+          </div>
+
+          <div class="bg-slate-800/80 p-6 rounded-3xl border border-slate-700 space-y-4">
+            <h3 class="font-extrabold text-base text-white">Kelola Multi-AI Provider (Failover Mode)</h3>
+            <div class="grid sm:grid-cols-3 gap-3 text-xs">
+              <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                <h4 class="font-bold text-white">Google Gemini</h4>
+                <p class="text-slate-400 mt-1">Model: gemini-1.5-flash (Prioritas 1)</p>
+                <span class="text-emerald-400 font-bold block mt-2">● Aktif</span>
+              </div>
+              <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                <h4 class="font-bold text-white">OpenAI GPT</h4>
+                <p class="text-slate-400 mt-1">Model: gpt-4o-mini (Prioritas 2)</p>
+                <span class="text-emerald-400 font-bold block mt-2">● Standby Failover</span>
+              </div>
+              <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                <h4 class="font-bold text-white">DeepSeek</h4>
+                <p class="text-slate-400 mt-1">Model: deepseek-chat (Prioritas 3)</p>
+                <span class="text-slate-500 font-bold block mt-2">○ Nonaktif</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // ---------------------------------------------------------------------------
+    // INTERACTION HANDLERS
+    // ---------------------------------------------------------------------------
+    function sendLandingDemoMessage() {
+      const input = document.getElementById('landingChatInput');
+      const val = input.value.trim();
+      if (!val) return;
+
+      state.demoChat.push({ sender: 'user', text: val });
+      input.value = '';
+      render();
+
+      setTimeout(() => {
+        const isInc = val.toLowerCase().includes('gajian');
+        const reply = isInc
+          ? `📅 Sabtu, 10 Okt 2026 — 12:40 WIB\n💰 <b>Pemasukan tercatat!</b>\n├ Nominal : <b>Rp 5.000.000</b>\n├ Kategori : 💼 Pemasukan\n├ Dompet : 👛 BCA (Default)\n└ Saldo baru : <b>Rp 19.820.000</b>\n\n💪 <i>Semangat terus! Jangan lupa sisihkan tabungan.</i>`
+          : `📅 Sabtu, 10 Okt 2026 — 12:40 WIB\n💸 <b>Pengeluaran tercatat!</b>\n├ Nominal : <b>Rp 35.000</b>\n├ Kategori : 🍜 Makanan & Minuman\n├ Dompet : 👛 BCA (Default)\n├ Catatan : ${val}\n└ Saldo : <b>Rp 14.785.000</b>\n\n📊 <b>Budget Makanan bulan ini:</b>\n[███████████████░░░░] 74.0% — sisa Rp 515.000\n<i>💡 Transaksi disinkronkan ke Supabase.</i>`;
+        state.demoChat.push({ sender: 'bot', text: reply });
+        render();
+        const chat = document.getElementById('landingChatArea');
+        if (chat) chat.scrollTop = chat.scrollHeight;
+      }, 350);
+    }
+
+    let currentTxType = 'expense';
+    function setTxType(t) {
+      currentTxType = t;
+      document.getElementById('tabExpense').className = t === 'expense' ? 'py-2 bg-orange-600 text-white rounded-xl text-xs font-bold' : 'py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold';
+      document.getElementById('tabIncome').className = t === 'income' ? 'py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold' : 'py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold';
+      document.getElementById('tabTransfer').className = t === 'transfer' ? 'py-2 bg-blue-600 text-white rounded-xl text-xs font-bold' : 'py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold';
+    }
+
+    function handleManualTransaction(e) {
+      e.preventDefault();
+      const amt = parseInt(document.getElementById('txAmount').value, 10);
+      const cat = document.getElementById('txCat').value;
+      const notes = document.getElementById('txNotes').value || 'Pencatatan manual web';
+
+      state.transactions.unshift({
+        id: String(Date.now()),
+        date: 'Baru saja, WIB',
+        type: currentTxType,
+        name: notes,
+        category: cat,
+        emoji: '📌',
+        wallet: 'BCA',
+        amount: amt,
+        source: 'web'
+      });
+
+      if (currentTxType === 'expense') state.user.balance -= amt;
+      else if (currentTxType === 'income') state.user.balance += amt;
+
+      alert(`Sukses! Transaksi ${formatRupiah(amt)} berhasil dicatat.`);
+      navigate('dashboard', 'laporan');
+    }
+
+    function toggleReceiptExpand(id) {
+      state.expandedReceiptId = state.expandedReceiptId === id ? null : id;
+      render();
+    }
+
+    function setDefaultWallet(id) {
+      state.wallets.forEach(w => w.isDefault = (w.id === id));
+      render();
+    }
+
+    function testBotConnection() {
+      state.telegramTestingStatus = 'testing';
+      state.botStatusMsg = '⏳ Testing getMe & setWebhook...';
+      render();
+
+      setTimeout(() => {
+        state.telegramTestingStatus = 'connected';
+        state.botStatusMsg = '🟢 Terhubung (@TataDana_bot) — Webhook aktif';
+        alert('Koneksi Sukses: Bot @TataDana_bot terverifikasi dan webhook berhasil didaftarkan ke https://tatadana.app/api/telegram/webhook');
+        render();
+      }, 700);
+    }
+
+    function downloadReport(format) {
+      const fileName = `TataDana_Laporan_Okt2026.${format}`;
+      alert(`Membuat dan mengunduh file ${fileName} dari Supabase Storage signed URL...`);
+      const element = document.createElement('a');
+      element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent('TataDana Executive Financial Report: Generated on-demand. Total Saldo: Rp 14.820.000'));
+      element.setAttribute('download', fileName);
+      element.style.display = 'none';
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    }
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>
